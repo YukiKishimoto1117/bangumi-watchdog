@@ -22,6 +22,7 @@ def sns():
     global _sns
     if _sns is None:
         _sns = boto3.client("sns")
+        
     return _sns
 
 
