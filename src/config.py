@@ -47,6 +47,10 @@ VIDEO_BYTES_PER_SEC = int(os.environ.get("VIDEO_BYTES_PER_SEC", "118000"))
 VIDEO_SIZE_TOLERANCE = float(os.environ.get("VIDEO_SIZE_TOLERANCE", "0.35"))
 # 尺が短い番組は誤差が大きいので、この秒数未満はサイズ検査しない
 VIDEO_SIZE_MIN_DURATION_SEC = 300
+# これ未満のバイト数は「実質空のファイル」として扱い、通常の未達と同じく
+# 即時通知(P1/P2)の対象にする。最短の番組（1分）でも正常なら約7MBあるため、
+# 1MBという閾値は安全に「収録が壊れている」と判定できる。
+VIDEO_MIN_VALID_BYTES = int(os.environ.get("VIDEO_MIN_VALID_BYTES", "1000000"))
 
 # ---- 分析結果CSVの検査閾値 ----
 EXPECTED_CSV_COLUMNS = [
@@ -54,16 +58,22 @@ EXPECTED_CSV_COLUMNS = [
     "start_sec", "end_sec", "title", "summary", "tags", "segment",
 ]
 KNOWN_SEGMENTS = {
-    "opening", "weather", "news", "sports", "ent",
+    "opening", "ending", "weather", "news", "sports", "ent",
     "feature", "live", "cm", "sponsor", "other",
 }
 # 区間の連続性を許容する誤差（秒）
 CONTIGUITY_TOLERANCE_SEC = 1.0
 # 最終 end_sec が番組尺の何割以上をカバーしていれば正常とみなすか
 MIN_COVERAGE_RATIO = 0.98
+# 短い番組は割合換算での誤差（数秒のズレ）が大きく出るので、
+# この秒数未満はカバー率検査をしない
+COVERAGE_MIN_DURATION_SEC = 600
 # 尺10分あたりの最低行数（2時間62行 ≒ 5.2行/10分 なので余裕を持って3）
 MIN_ROWS_PER_10MIN = 3.0
 # 同一タイトルが何回連続したら固着とみなすか（CMは除外）
 MAX_SAME_TITLE_RUN = 3
 # CM区間が総尺に占める比率の許容レンジ
 CM_RATIO_RANGE = (0.02, 0.45)
+# 尺が短い番組は固定長のCM枠が比率を押し上げやすいので、
+# この秒数未満はCM比率検査をしない
+CM_RATIO_MIN_DURATION_SEC = 600

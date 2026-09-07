@@ -21,7 +21,7 @@ import epg
 import csv_check
 
 
-doc = json.load(open(f"{FIXTURES}/bangumi_20260831.json"))
+doc = json.load(open(f"{FIXTURES}/bangumi_20260831.json", encoding="utf-8"))
 progs = epg.programs_from(doc)
 print(f"監視対象3局の番組数: {len(progs)}")
 

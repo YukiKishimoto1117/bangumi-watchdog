@@ -56,6 +56,14 @@ def check_epg(now: dt.datetime):
 # --------------------------------------------------------------------------
 # ② 動画の到達
 # --------------------------------------------------------------------------
+def video_reached(p: epg.Program, inv: dict, spans_by_ch: dict) -> bool:
+    """番組専用のファイルが無くても、前後の番組と連結された録画に
+    含まれていれば到達とみなす（実データで連結が頻発することを確認済み）。"""
+    if p.video_key in inv:
+        return True
+    return epg.covered_by(spans_by_ch.get(p.ch, []), p.start)
+
+
 def check_videos(now: dt.datetime, programs: list[epg.Program]):
     """締切を過ぎた番組のうち、動画が無いものを返す。"""
     deadline = now - dt.timedelta(minutes=C.VIDEO_GRACE_MINUTES)
@@ -67,14 +75,16 @@ def check_videos(now: dt.datetime, programs: list[epg.Program]):
 
     dates = sorted({p.end.date() for p in due})
     inv = build_inventory(C.MOVIE_PREFIX, C.CHANNELS, dates)
+    spans_by_ch = {ch: epg.build_recording_spans(inv, ch) for ch in C.CHANNELS}
 
     missing, zero_size, size_odd = [], [], []
     for p in due:
         size = inv.get(p.video_key)
         if size is None:
-            missing.append(p)
+            if not video_reached(p, inv, spans_by_ch):
+                missing.append(p)
             continue
-        if size == 0:
+        if size < C.VIDEO_MIN_VALID_BYTES:
             zero_size.append(p)
             continue
         note = size_anomaly(p, size)
@@ -85,7 +95,12 @@ def check_videos(now: dt.datetime, programs: list[epg.Program]):
 
 def size_anomaly(p: epg.Program, size: int) -> str | None:
     """③の一部。ほぼ固定ビットレートなので、サイズと尺の比で
-    途中切れ・異常な短さを ffmpeg なしで検知する。"""
+    途中切れ・異常な短さを ffmpeg なしで検知する。
+
+    ただし「大きすぎる」方向は、収録が次の番組まで連結された結果である
+    ことが実データで多いため、逆算した終了時刻が番組終了より大きくズレて
+    いる場合は連結とみなして異常扱いしない（「小さすぎる」は連結では
+    起きないため対象外）。"""
     if p.duration_sec < C.VIDEO_SIZE_MIN_DURATION_SEC:
         return None
     expect = p.duration_sec * C.VIDEO_BYTES_PER_SEC
@@ -95,6 +110,10 @@ def size_anomaly(p: epg.Program, size: int) -> str | None:
     lo, hi = 1 - C.VIDEO_SIZE_TOLERANCE, 1 + C.VIDEO_SIZE_TOLERANCE
     if lo <= ratio <= hi:
         return None
+    if ratio > hi:
+        actual_end = p.start + dt.timedelta(seconds=size / C.VIDEO_BYTES_PER_SEC)
+        if actual_end > p.end + dt.timedelta(seconds=C.EPG_GAP_TOLERANCE_SEC):
+            return None
     kind = "小さすぎる（途中切れ・映像喪失の疑い）" if ratio < lo else "大きすぎる"
     return (
         f"サイズが{kind}: {size / 1024 / 1024:.0f}MB "
@@ -241,11 +260,12 @@ def daily_summary(now: dt.datetime):
         lines.append(f"      {c}")
 
     lines += ["", "── ② 動画の到達 ──"]
+    spans_by_ch = {ch: epg.build_recording_spans(inv, ch) for ch in C.CHANNELS}
     total_missing = []
     size_notes: list[str] = []
     for ch in C.CHANNELS:
         plist = [p for p in day_progs if p.ch == ch]
-        miss = [p for p in plist if p.video_key not in inv]
+        miss = [p for p in plist if not video_reached(p, inv, spans_by_ch)]
         total_missing += miss
         mark = "✓" if not miss else "✗"
         lines.append(f"  {mark} {_ch_label(ch)}: {len(plist) - len(miss)}/{len(plist)}")

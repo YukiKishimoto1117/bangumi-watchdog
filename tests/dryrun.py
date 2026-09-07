@@ -18,7 +18,7 @@ C.SNS_TOPIC_ARN = ""  # 未設定 -> 標準出力に印字
 
 import aws_util, epg, handler
 
-DOC = json.load(open(f"{FIXTURES}/bangumi_20260831.json"))
+DOC = json.load(open(f"{FIXTURES}/bangumi_20260831.json", encoding="utf-8"))
 CSV = open(f"{FIXTURES}/CH6_20260828_060000_corners.csv", encoding="utf-8-sig").read()
 
 INVENTORY = {}          # 空 = 動画も分析結果も1件も無い

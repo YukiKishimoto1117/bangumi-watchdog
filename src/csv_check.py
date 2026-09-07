@@ -65,9 +65,10 @@ def validate(text: str, prog, video_size: int | None = None) -> list[str]:
         issues.append(f"区間の不連続({kind}) {len(gaps)}箇所: {gaps[:3]}")
 
     # --- カバレッジ（途中切れ / MAX_TOKENS の検知）---
+    # 短い番組は数秒のズレが割合を大きく動かすため対象外
     total = spans[-1][1]
     expect = prog.duration_sec
-    if expect > 0:
+    if expect > 0 and expect >= C.COVERAGE_MIN_DURATION_SEC:
         ratio = total / expect
         if ratio < C.MIN_COVERAGE_RATIO:
             issues.append(
@@ -110,11 +111,13 @@ def validate(text: str, prog, video_size: int | None = None) -> list[str]:
         issues.append(f"同一titleが{worst[0]}回連続: 「{worst[1][:30]}」")
 
     # --- CM比率 ---
-    cm_sec = sum(e - s for (s, e), r in zip(spans, rows) if r["segment"] == "cm")
-    if total > 0:
-        cm_ratio = cm_sec / total
-        lo, hi = C.CM_RATIO_RANGE
-        if not (lo <= cm_ratio <= hi):
-            issues.append(f"CM比率が想定外: {cm_ratio:.1%}（想定 {lo:.0%}〜{hi:.0%}）")
+    # 短い番組は固定長のCM枠が比率を押し上げやすいため対象外
+    if prog.duration_sec >= C.CM_RATIO_MIN_DURATION_SEC:
+        cm_sec = sum(e - s for (s, e), r in zip(spans, rows) if r["segment"] == "cm")
+        if total > 0:
+            cm_ratio = cm_sec / total
+            lo, hi = C.CM_RATIO_RANGE
+            if not (lo <= cm_ratio <= hi):
+                issues.append(f"CM比率が想定外: {cm_ratio:.1%}（想定 {lo:.0%}〜{hi:.0%}）")
 
     return issues

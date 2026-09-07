@@ -5,6 +5,7 @@ EPGファイル bangumi_{date}.json は「その日の04:30頃 〜 翌日05:20�
 両方を読んでマージする。
 """
 import json
+import re
 import datetime as dt
 from dataclasses import dataclass
 
@@ -154,5 +155,42 @@ def is_analysis_target(prog: Program) -> bool:
     for hhmm_from, hhmm_to in C.ANALYSIS_WINDOWS:
         w_start, w_end = _window_bounds(prog.start.date(), hhmm_from, hhmm_to)
         if prog.start < w_end and prog.end > w_start:
+            return True
+    return False
+
+
+_VIDEO_KEY_RE = re.compile(r"^[^/]+/[^/]+/\d{8}/[A-Za-z0-9]+_(\d{8})_(\d{4})00\.mp4$")
+
+
+def build_recording_spans(inventory: dict[str, int], ch: str) -> list[tuple[dt.datetime, dt.datetime]]:
+    """収録システムはEPGの番組境界でファイルを切ろうとするが、実データでは
+    たまに区切りに失敗し、複数番組が1本のファイルに連結される
+    （例: 03:17開始の番組のファイルが、後続の3番組分まで飲み込んで1本になっていた）。
+
+    ファイル名に埋め込まれた開始時刻と、サイズから逆算した長さで、
+    その局が実際にカバーしている時間帯（録画区間）の一覧を作る。
+    専用ファイルが見つからない番組が、連結録画に含まれていないか確認するために使う。
+    """
+    needle = f"/{ch}/"
+    spans = []
+    for key, size in inventory.items():
+        if needle not in key:
+            continue
+        m = _VIDEO_KEY_RE.match(key)
+        if not m:
+            continue
+        start = dt.datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M").replace(tzinfo=C.JST)
+        end = start + dt.timedelta(seconds=size / C.VIDEO_BYTES_PER_SEC)
+        spans.append((start, end))
+    spans.sort()
+    return spans
+
+
+def covered_by(spans: list[tuple[dt.datetime, dt.datetime]], moment: dt.datetime) -> bool:
+    """momentがどれかの録画区間に含まれるか（開始時刻でソート済みのspans前提）。"""
+    for start, end in spans:
+        if start > moment:
+            break
+        if start <= moment < end:
             return True
     return False
