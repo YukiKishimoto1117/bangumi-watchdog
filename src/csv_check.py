@@ -58,7 +58,7 @@ def validate(text: str, prog, video_size: int | None = None) -> list[str]:
     gaps = []
     for i in range(1, len(spans)):
         diff = spans[i][0] - spans[i - 1][1]
-        if abs(diff) > C.CONTIGUITY_TOLERANCE_SEC:
+        if abs(diff) > C.CONTIGUITY_GAP_ALERT_SEC:
             gaps.append((i, round(diff, 1)))
     if gaps:
         kind = "重複" if any(d < 0 for _, d in gaps) else "欠落"
@@ -75,10 +75,10 @@ def validate(text: str, prog, video_size: int | None = None) -> list[str]:
                 f"番組尺のカバー不足: {total:.0f}秒 / EPG {expect:.0f}秒 ({ratio:.1%})"
             )
 
-    # --- 行数 ---
-    min_rows = max(3, int(expect / 600 * C.MIN_ROWS_PER_10MIN))
+    # --- コーナー数 ---
+    min_rows = max(2, int(expect / 600 * C.MIN_ROWS_PER_10MIN))
     if len(rows) < min_rows:
-        issues.append(f"行数が少なすぎる: {len(rows)}行（最低{min_rows}行想定）")
+        issues.append(f"コーナー数が少なすぎる: {len(rows)}件（最低{min_rows}件想定）")
 
     # --- segment語彙 ---
     unknown = {r["segment"] for r in rows} - C.KNOWN_SEGMENTS

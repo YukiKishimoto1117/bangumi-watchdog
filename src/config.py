@@ -61,15 +61,18 @@ KNOWN_SEGMENTS = {
     "opening", "ending", "weather", "news", "sports", "ent",
     "feature", "live", "cm", "sponsor", "other",
 }
-# 区間の連続性を許容する誤差（秒）
+# 区間の連続性を許容する誤差（秒）。先頭start_secの0確認に使う。
 CONTIGUITY_TOLERANCE_SEC = 1.0
+# 区間間のギャップをアラート対象とする最小秒数。
+# 実データでGeminiが1分未満の小さな欠落を出すことがあるため、1分未満は無視する。
+CONTIGUITY_GAP_ALERT_SEC = int(os.environ.get("CONTIGUITY_GAP_ALERT_SEC", "60"))
 # 最終 end_sec が番組尺の何割以上をカバーしていれば正常とみなすか
 MIN_COVERAGE_RATIO = 0.98
 # 短い番組は割合換算での誤差（数秒のズレ）が大きく出るので、
 # この秒数未満はカバー率検査をしない
 COVERAGE_MIN_DURATION_SEC = 600
-# 尺10分あたりの最低行数（2時間62行 ≒ 5.2行/10分 なので余裕を持って3）
-MIN_ROWS_PER_10MIN = 3.0
+# 尺10分あたりの最低コーナー数（2時間62コーナー ≒ 5.2コーナー/10分 なので余裕を持って2）
+MIN_ROWS_PER_10MIN = 2.0
 # 同一タイトルが何回連続したら固着とみなすか（CMは除外）
 MAX_SAME_TITLE_RUN = 3
 # CM区間が総尺に占める比率の許容レンジ

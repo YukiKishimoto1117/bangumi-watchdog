@@ -73,7 +73,11 @@ def check_videos(now: dt.datetime, programs: list[epg.Program]):
     if not due:
         return [], []
 
-    dates = sorted({p.end.date() for p in due})
+    # 深夜またぎの番組は、収録システムが実際のファイルを終了予定日の
+    # 翌日フォルダに置くことがある（例: 23:00-23:59の番組の実ファイルが
+    # 翌日フォルダに入っていたケースを確認済み）。前後1日も読んで拾う。
+    end_dates = {p.end.date() for p in due}
+    dates = sorted({d + dt.timedelta(days=delta) for d in end_dates for delta in (-1, 0, 1)})
     inv = build_inventory(C.MOVIE_PREFIX, C.CHANNELS, dates)
     spans_by_ch = {ch: epg.build_recording_spans(inv, ch) for ch in C.CHANNELS}
 
@@ -240,7 +244,8 @@ def daily_summary(now: dt.datetime):
     programs, epg_missing = epg.collect_programs(s3(), dates)
 
     day_progs = [p for p in programs if p.start.date() == target_date]
-    video_dates = sorted({p.end.date() for p in day_progs}) or [target_date]
+    end_dates = {p.end.date() for p in day_progs} or {target_date}
+    video_dates = sorted({d + dt.timedelta(days=delta) for d in end_dates for delta in (-1, 0, 1)})
     inv = build_inventory(C.MOVIE_PREFIX, C.CHANNELS, video_dates)
 
     lines = [
